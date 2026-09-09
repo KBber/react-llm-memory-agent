@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReAct Financial Agent — 多轮记忆演示</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  /* ── 顶部 ── */
+  header {
+    background: #1a1d27;
+    border-bottom: 1px solid #2d3148;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  header .brand h1 { font-size: 18px; font-weight: 600; color: #a78bfa; }
+  header .brand .subtitle { font-size: 12px; color: #64748b; }
+  header .session-info {
+    font-size: 12px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header .session-info code {
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #a78bfa;
+    font-family: monospace;
+  }
+  header .new-session-btn {
+    background: transparent;
+    border: 1px solid #3d4163;
+    color: #94a3b8;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  header .new-session-btn:hover { border-color: #7c3aed; color: #a78bfa; }
+
+  /* ── 主体布局 ── */
+  .layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 16px;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+  }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { order: -1; }
+  }
+
+  /* ── 主区 ── */
+  .main { display: flex; flex-direction: column; gap: 16px; }
+
+  .input-card {
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .mode-toggle .label { font-size: 13px; color: #64748b; margin-right: 4px; }
+  .mode-btn {
+    padding: 5px 14px;
+    border-radius: 18px;
+    border: 1px solid #3d4163;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mode-btn.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+
+  .input-row { display: flex; gap: 10px; }
+  textarea {
+    flex: 1;
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 10px 14px;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 68px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: #7c3aed; }
+  .send-btn {
+    padding: 0 24px;
+    background: #7c3aed;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .send-btn:hover:not(:disabled) { background: #6d28d9; }
+  .send-btn:disabled { background: #3d4163; cursor: not-allowed; }
+
+  .examples { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .example-chip {
+    background: #1e2235;
+    border: 1px solid #2d3148;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .example-chip:hover { border-color: #7c3aed; color: #a78bfa; }
+  .example-chip.followup { border-color: #4c1d95; color: #c4b5fd; }
+  .example-chip.followup:hover { background: #2d1f5e; }
+
+  /* ── 状态栏 ── */
+  .status-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .status-bar.visible { display: flex; }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid #3d4163;
+    border-top-color: #7c3aed;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 步骤卡片 ── */
+  .steps-container { display: flex; flex-direction: column; gap: 12px; }
+
+  .rewrite-banner {
+    background: linear-gradient(90deg, #2d1f5e 0%, #1a1d27 100%);
+    border: 1px solid #4c1d95;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #c4b5fd;
+    animation: fadeIn 0.3s ease;
+  }
+  .rewrite-banner .label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a78bfa;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .rewrite-banner .arrow { color: #a78bfa; margin: 0 6px; }
+  .rewrite-banner .reason { color: #94a3b8; font-size: 12px; margin-top: 4px; }
+
+  .step-card {
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 10px;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-badge {
+    background: #2d3148;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  .step-title { font-size: 14px; font-weight: 500; flex: 1; }
+  .step-toggle { color: #64748b; font-size: 12px; }
+  .step-body { padding: 0 16px 14px; }
+
+  .thought-block  { border-left: 3px solid #38bdf8; padding-left: 12px; margin-bottom: 10px; }
+  .action-block   { border-left: 3px solid #fbbf24; padding-left: 12px; margin-bottom: 10px; }
+  .obs-block      { border-left: 3px solid #34d399; padding-left: 12px; }
+
+  .block-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .thought-block  .block-label { color: #38bdf8; }
+  .action-block   .block-label { color: #fbbf24; }
+  .obs-block      .block-label { color: #34d399; }
+
+  .block-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .obs-block .block-content {
+    max-height: 220px;
+    overflow-y: auto;
+    background: #0d1017;
+    border-radius: 4px;
+    padding: 6px 10px;
+    scrollbar-width: thin;
+    scrollbar-color: #3d4163 transparent;
+  }
+  .tool-pill {
+    display: inline-block;
+    background: #2d1f5e;
+    border: 1px solid #4c1d95;
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 12px;
+    color: #a78bfa;
+    font-family: monospace;
+    margin-bottom: 6px;
+  }
+  .args-code {
+    background: #0f1117;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+
+  .final-card {
+    background: #1a1d27;
+    border: 1px solid #4c1d95;
+    border-radius: 10px;
+    padding: 18px;
+    animation: fadeIn 0.3s ease;
+  }
+  .final-card h3 { color: #a78bfa; font-size: 14px; margin-bottom: 10px; }
+  .final-card .answer-text {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #e2e8f0;
+    white-space: pre-wrap;
+  }
+  .meta-row {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #475569;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .fc-thought-note {
+    font-size: 12px;
+    color: #475569;
+    font-style: italic;
+  }
+
+  .step-body.collapsed { display: none; }
+  .step-toggle.open::before { content: "▲"; }
+  .step-toggle:not(.open)::before { content: "▼"; }
+
+  /* ── 侧栏 ── */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+  }
+  .panel {
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .panel-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-title .count {
+    background: #2d3148;
+    color: #a78bfa;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  .memory-turn {
+    padding: 10px;
+    border-radius: 8px;
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .memory-turn:last-child { margin-bottom: 0; }
+  .memory-turn .turn-no { color: #64748b; font-size: 11px; margin-bottom: 4px; }
+  .memory-turn .q { color: #e2e8f0; margin-bottom: 4px; line-height: 1.5; }
+  .memory-turn .q.rewritten { color: #c4b5fd; }
+  .memory-turn .q.rewritten::before { content: "✏️ "; }
+  .memory-turn .entities { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .memory-turn .entity-chip {
+    background: #2d1f5e;
+    border: 1px solid #4c1d95;
+    color: #a78bfa;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-family: monospace;
+  }
+  .memory-turn .metric {
+    margin-top: 6px;
+    color: #64748b;
+    font-size: 11px;
+  }
+  .memory-turn .metric span { color: #fbbf24; }
+
+  .empty-hint {
+    color: #475569;
+    font-size: 12px;
+    text-align: center;
+    padding: 18px 8px;
+    line-height: 1.6;
+  }
+  .empty-hint strong { color: #94a3b8; }
+
+  .session-list-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #94a3b8;
+    transition: background 0.15s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .session-list-item:hover { background: #0f1117; }
+  .session-list-item.active { background: #2d1f5e; color: #c4b5fd; }
+  .session-list-item .sid { font-family: monospace; }
+  .session-list-item .turns { color: #475569; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>⚡ ReAct Financial Agent · 多轮记忆</h1>
+    <div class="subtitle">短期记忆 + 实体追踪 + 指代消解 ｜ 数据：A 股年报 + AkShare</div>
+  </div>
+  <div class="session-info">
+    <span>当前会话：</span>
+    <code id="sessionId">未创建</code>
+    <button class="new-session-btn" onclick="createNewSession()">+ 新会话</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <div class="main">
+    <div class="input-card">
+      <div class="mode-toggle">
+        <span class="label">实现：</span>
+        <button class="mode-btn active" data-mode="manual" onclick="setMode('manual',this)">手写 Prompt 解析</button>
+        <button class="mode-btn" data-mode="fc" onclick="setMode('fc',this)">Function Calling</button>
+      </div>
+      <div class="input-row">
+        <textarea id="question" placeholder="输入问题，例如：贵州茅台和五粮液2023年的毛利率哪家更高？"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendQuery()">发 送</button>
+      </div>
+      <div class="examples">
+        <span style="font-size:12px;color:#475569;margin-right:4px;">首轮示例：</span>
+        <span class="example-chip" onclick="setQuestion(this.textContent)">茅台和五粮液2023年毛利率差多少个百分点？</span>
+        <span class="example-chip" onclick="setQuestion(this.textContent)">宁德时代2021-2023年营收复合增长率是多少？</span>
+        <span class="example-chip" onclick="setQuestion(this.textContent)">海康威视2023年年报提到了哪些主要风险？</span>
+      </div>
+      <div class="examples" id="followupExamples" style="margin-top:8px;display:none;">
+        <span style="font-size:12px;color:#475569;margin-right:4px;">追问示例（触发指代消解）：</span>
+        <span class="example-chip followup" onclick="setQuestion(this.textContent)">那另一家呢？</span>
+        <span class="example-chip followup" onclick="setQuestion(this.textContent)">那宁德时代呢？</span>
+        <span class="example-chip followup" onclick="setQuestion(this.textContent)">它的营收呢？</span>
+        <span class="example-chip followup" onclick="setQuestion(this.textContent)">另一家去年的情况呢？</span>
+      </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+      <div class="spinner"></div>
+      <span id="statusText">正在思考...</span>
+    </div>
+
+    <div class="steps-container" id="stepsContainer"></div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="panel">
+      <div class="panel-title">
+        <span>当前会话记忆</span>
+        <span class="count" id="turnCount">0</span>
+      </div>
+      <div id="memoryList">
+        <div class="empty-hint">
+          会话刚创建，还没有任何轮次。<br>
+          先问个问题，记忆就会出现在这里。
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">
+        <span>历史会话</span>
+        <span class="count" id="sessionCount">0</span>
+      </div>
+      <div id="sessionList">
+        <div class="empty-hint">加载中...</div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+  let currentMode = 'manual';
+  let isRunning   = false;
+  let sessionId   = localStorage.getItem('react_session_id') || null;
+
+  // ── 会话管理 ────────────────────────────────────────────────────────────────
+  async function ensureSession() {
+    if (sessionId) {
+      // 校验会话是否还存在
+      try {
+        const r = await fetch(`/sessions/${sessionId}`);
+        if (r.ok) {
+          document.getElementById('sessionId').textContent = sessionId;
+          await refreshMemory();
+          await refreshSessions();
+          return;
+        }
+      } catch (e) {}
+      sessionId = null;
+      localStorage.removeItem('react_session_id');
+    }
+    await createNewSession();
+  }
+
+  async function createNewSession() {
+    const r = await fetch('/sessions', { method: 'POST' });
+    const d = await r.json();
+    sessionId = d.session_id;
+    localStorage.setItem('react_session_id', sessionId);
+    document.getElementById('sessionId').textContent = sessionId;
+    document.getElementById('stepsContainer').innerHTML = '';
+    await refreshMemory();
+    await refreshSessions();
+  }
+
+  async function refreshMemory() {
+    if (!sessionId) return;
+    try {
+      const r = await fetch(`/sessions/${sessionId}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      renderMemory(d.turns || []);
+    } catch (e) {}
+  }
+
+  async function refreshSessions() {
+    try {
+      const r = await fetch('/sessions');
+      const d = await r.json();
+      renderSessions(d.sessions || []);
+    } catch (e) {}
+  }
+
+  function renderMemory(turns) {
+    document.getElementById('turnCount').textContent = turns.length;
+    // 第二轮起显示追问示例
+    document.getElementById('followupExamples').style.display = turns.length >= 1 ? 'flex' : 'none';
+
+    const list = document.getElementById('memoryList');
+    if (!turns.length) {
+      list.innerHTML = `<div class="empty-hint">会话刚创建，还没有任何轮次。<br>先问个问题，记忆就会出现在这里。</div>`;
+      return;
+    }
+    list.innerHTML = turns.slice().reverse().map(t => `
+      <div class="memory-turn">
+        <div class="turn-no">第 ${t.turn_id} 轮</div>
+        <div class="q ${t.was_rewritten ? 'rewritten' : ''}">${esc(t.user_question)}</div>
+        ${t.was_rewritten && t.rewritten_question
+          ? `<div class="q" style="color:#94a3b8;font-size:11px;">→ ${esc(t.rewritten_question)}</div>`
+          : ''}
+        ${(t.entities || []).length ? `
+          <div class="entities">
+            ${t.entities.map(e => `<span class="entity-chip">${esc(e.name)}${e.code ? ' ' + e.code : ''}</span>`).join('')}
+          </div>` : ''}
+        ${t.metric_focus ? `<div class="metric">指标：<span>${esc(t.metric_focus)}</span></div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function renderSessions(sessions) {
+    document.getElementById('sessionCount').textContent = sessions.length;
+    const list = document.getElementById('sessionList');
+    if (!sessions.length) {
+      list.innerHTML = `<div class="empty-hint">暂无历史会话</div>`;
+      return;
+    }
+    list.innerHTML = sessions.map(s => `
+      <div class="session-list-item ${s.session_id === sessionId ? 'active' : ''}"
+           onclick="switchSession('${s.session_id}')">
+        <span class="sid">${esc(s.session_id.slice(0, 14))}…</span>
+        <span class="turns">${s.turn_count} 轮</span>
+      </div>
+    `).join('');
+  }
+
+  async function switchSession(sid) {
+    sessionId = sid;
+    localStorage.setItem('react_session_id', sid);
+    document.getElementById('sessionId').textContent = sid;
+    document.getElementById('stepsContainer').innerHTML = '';
+    await refreshMemory();
+    await refreshSessions();
+  }
+
+  // ── UI 辅助 ────────────────────────────────────────────────────────────────
+  function setMode(mode, btn) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function setQuestion(text) {
+    document.getElementById('question').value = text;
+  }
+
+  function setStatus(text, visible) {
+    const bar = document.getElementById('statusBar');
+    document.getElementById('statusText').textContent = text;
+    bar.classList.toggle('visible', visible);
+  }
+
+  function setSendEnabled(enabled) {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = !enabled;
+    btn.textContent = enabled ? '发 送' : '运行中...';
+    isRunning = !enabled;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function createRewriteBanner(data) {
+    const card = document.createElement('div');
+    card.className = 'rewrite-banner';
+    card.innerHTML = `
+      <div class="label">🧠 短期记忆改写</div>
+      <div>${esc(data.raw_question)} <span class="arrow">→</span> <strong>${esc(data.question)}</strong></div>
+      <div class="reason">策略：${esc(data.strategy)} ｜ ${esc(data.reason)}</div>
+    `;
+    return card;
+  }
+
+  function createStepCard(stepData) {
+    const card = document.createElement('div');
+    card.className = 'step-card';
+
+    const isManual = (currentMode === 'manual');
+
+    const header = document.createElement('div');
+    header.className = 'step-header';
+    header.innerHTML = `
+      <span class="step-badge">Step ${stepData.step}</span>
+      <span class="step-title">🔧 ${esc(stepData.action)}(${esc(JSON.stringify(stepData.action_input||{}))})</span>
+      <span class="step-toggle open"></span>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'step-body';
+
+    if (isManual && stepData.thought) {
+      body.innerHTML += `
+        <div class="thought-block">
+          <div class="block-label">Thought</div>
+          <div class="block-content">${esc(stepData.thought)}</div>
+        </div>`;
+    } else if (!isManual) {
+      body.innerHTML += `
+        <div class="thought-block">
+          <div class="block-label">Thought</div>
+          <div class="fc-thought-note">Function Calling 版：模型内部推理，不可见</div>
+        </div>`;
+    }
+
+    body.innerHTML += `
+      <div class="action-block">
+        <div class="block-label">Action</div>
+        <span class="tool-pill">${esc(stepData.action)}</span>
+        <div class="args-code">${esc(JSON.stringify(stepData.action_input||{}, null, 2))}</div>
+      </div>
+      <div class="obs-block">
+        <div class="block-label">Observation</div>
+        <div class="block-content">${esc((stepData.observation||'').replace(/\n{3,}/g, '\n\n').trim())}</div>
+      </div>`;
+
+    header.addEventListener('click', () => {
+      body.classList.toggle('collapsed');
+      header.querySelector('.step-toggle').classList.toggle('open');
+    });
+
+    card.appendChild(header);
+    card.appendChild(body);
+    return card;
+  }
+
+  function createFinalCard(stepData, totalSteps, elapsedS) {
+    const card = document.createElement('div');
+    card.className = 'final-card';
+    card.innerHTML = `
+      <h3>✅ Final Answer</h3>
+      <div class="answer-text">${esc(stepData.answer)}</div>
+      <div class="meta-row">
+        <span>共 ${totalSteps} 步</span>
+        <span>耗时 ~${elapsedS}s</span>
+        <span>实现：${ currentMode === 'manual' ? '手写Prompt解析' : 'Function Calling' }</span>
+      </div>`;
+    return card;
+  }
+
+  function createErrorCard(msg) {
+    const card = document.createElement('div');
+    card.className = 'final-card';
+    card.style.borderColor = '#7f1d1d';
+    card.innerHTML = `<h3 style="color:#f87171">⚠️ ${esc(msg)}</h3>`;
+    return card;
+  }
+
+  // ── 主发送逻辑 ─────────────────────────────────────────────────────────────
+  async function sendQuery() {
+    if (isRunning || !sessionId) return;
+    const question = document.getElementById('question').value.trim();
+    if (!question) return;
+
+    document.getElementById('stepsContainer').innerHTML = '';
+    setSendEnabled(false);
+    setStatus('正在连接...', true);
+
+    const endpoint = `/sessions/${sessionId}/query/${currentMode}`;
+    const startTime = Date.now();
+    let actionStepCount = 0;
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, max_steps: 10 }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      const reader  = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let   buffer  = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let data;
+          try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (data.type === 'start') {
+            setStatus(`🧠 思考中... (${currentMode === 'manual' ? '手写Prompt解析' : 'Function Calling'})`, true);
+
+          } else if (data.type === 'memory_rewrite') {
+            document.getElementById('stepsContainer').appendChild(createRewriteBanner(data));
+
+          } else if (data.type === 'action') {
+            actionStepCount++;
+            setStatus(`Step ${data.step}：正在调用 ${data.action}...`, true);
+            const card = createStepCard(data);
+            document.getElementById('stepsContainer').appendChild(card);
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+          } else if (data.type === 'final') {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            const card = createFinalCard(data, actionStepCount, elapsed);
+            document.getElementById('stepsContainer').appendChild(card);
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setStatus('完成', false);
+
+          } else if (data.type === 'max_steps' || data.type === 'error') {
+            const card = createErrorCard(data.answer || data.observation || '未知错误');
+            document.getElementById('stepsContainer').appendChild(card);
+            setStatus('', false);
+
+          } else if (data.type === 'memory_snapshot') {
+            // 流末尾刷新记忆侧栏
+            refreshMemory();
+            refreshSessions();
+
+          } else if (data.type === 'done') {
+            setStatus('', false);
+          }
+        }
+      }
+    } catch (err) {
+      document.getElementById('stepsContainer').appendChild(createErrorCard(`请求失败: ${err.message}`));
+      setStatus('', false);
+    } finally {
+      setSendEnabled(true);
+    }
+  }
+
+  document.getElementById('question').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
+  });
+
+  // ── 启动 ──────────────────────────────────────────────────────────────────
+  ensureSession();
+</script>
+</body>
+</html>
