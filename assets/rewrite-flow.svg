@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+<rect width="900" height="540" fill="#0f1117"/>
+<text x="450.0" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#e2e8f0">指代消解流程</text>
+
+<rect x="340" y="80" width="220" height="50" rx="25" fill="#1a1d27" stroke="#e2e8f0" stroke-width="1.5"/>
+<text x="450" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">用户追问</text>
+
+<polygon points="450,160 620,210 450,260 280,210" stroke="#38bdf8" stroke-width="1.5" fill="#1a1d27"/>
+<text x="450" y="205" text-anchor="middle" font-size="12" font-weight="700" fill="#38bdf8">包含指代触发词？</text>
+<text x="450" y="222" text-anchor="middle" font-size="10" fill="#64748b">那另一家 / 再来一次 / 那呢</text>
+<line x1="450" y1="130" x2="450" y2="160" stroke="#e2e8f0" stroke-width="1.5"/>
+<text x="180" y="200" text-anchor="middle" font-size="11" fill="#64748b">否</text>
+<line x1="280" y1="210" x2="180" y2="210" stroke="#e2e8f0" stroke-width="1.5"/>
+<rect x="60" y="185" width="120" height="50" rx="8" fill="#1a1d27" stroke="#2d3148"/>
+<text x="120" y="215" text-anchor="middle" font-size="13" fill="#e2e8f0">原样发送</text>
+<text x="720" y="200" text-anchor="middle" font-size="11" fill="#64748b">是</text>
+<line x1="620" y1="210" x2="780" y2="210" stroke="#e2e8f0" stroke-width="1.5"/>
+<polygon points="780,210 770,205 770,215" fill="#e2e8f0"/>
+<polygon points="800,210 880,260 800,310 720,260" stroke="#38bdf8" stroke-width="1.5" fill="#1a1d27"/>
+<text x="800" y="255" text-anchor="middle" font-size="11" font-weight="700" fill="#38bdf8">哪类？</text>
+<text x="755" y="290" text-anchor="middle" font-size="10" fill="#64748b">对比</text>
+<line x1="720" y1="260" x2="660" y2="260" stroke="#e2e8f0" stroke-width="1.5"/>
+<rect x="430" y="320" width="230" height="70" rx="8" fill="#1a1d27" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="545" y="345" text-anchor="middle" font-size="13" font-weight="700" fill="#a78bfa">contrast 策略</text>
+<text x="545" y="365" text-anchor="middle" font-size="10" fill="#64748b">从上一轮实体里挑未提及的</text>
+<text x="545" y="380" text-anchor="middle" font-size="10" fill="#64748b">替换"那另一家"为具体公司名</text>
+<text x="845" y="290" text-anchor="middle" font-size="10" fill="#64748b">重复</text>
+<line x1="800" y1="310" x2="800" y2="340" stroke="#e2e8f0" stroke-width="1.5"/>
+<rect x="685" y="345" width="230" height="70" rx="8" fill="#1a1d27" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="800" y="370" text-anchor="middle" font-size="13" font-weight="700" fill="#a78bfa">repeat 策略</text>
+<text x="800" y="390" text-anchor="middle" font-size="10" fill="#64748b">沿用上一轮 metric_focus</text>
+<line x1="545" y1="395" x2="545" y2="440" stroke="#e2e8f0" stroke-width="1.5"/>
+<line x1="800" y1="420" x2="800" y2="440" stroke="#e2e8f0" stroke-width="1.5"/>
+<line x1="545" y1="440" x2="800" y2="440" stroke="#e2e8f0" stroke-width="1.5"/>
+<line x1="450" y1="440" x2="450" y2="470" stroke="#e2e8f0" stroke-width="1.5"/>
+<rect x="240" y="470" width="430" height="50" rx="25" fill="#a78bfa" opacity="0.2" stroke="#a78bfa" stroke-width="2"/>
+<text x="455" y="500" text-anchor="middle" font-size="13" font-weight="700" fill="#a78bfa">改写后的问题 → ReAct Loop</text>
+</svg>
