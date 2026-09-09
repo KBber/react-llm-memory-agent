@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# FAISS 索引（41MB + 15MB）—— 体积太大不进仓库，README 给出重建指引
+vectorstore/*.bin
+vectorstore/*.json
+
+# 运行时自动生成的短期记忆
+data/memory/
+
+# 测试产物
+tests/.cache/
+.pytest_cache/
+*.log
+
+# 环境变量
+.env
+.env.local
